@@ -61,7 +61,7 @@ Design and build a **production-grade-equivalent** DevSecOps pipeline that:
 
 ## Architecture
 
-![Architecture diagram](docs/architecture.svg)
+![Architecture diagram](docs/flux_architecture_devsecops_k3s.svg)
 
 ### Component map
 
