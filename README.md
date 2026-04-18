@@ -8,6 +8,7 @@ End-to-end secure software delivery pipeline combining Infrastructure-as-Code, a
 [![Terraform](https://img.shields.io/badge/Terraform-623CE4?logo=terraform&logoColor=white)](https://terraform.io)
 [![Ansible](https://img.shields.io/badge/Ansible-EE0000?logo=ansible&logoColor=white)](https://ansible.com)
 [![GitLab CI](https://img.shields.io/badge/GitLab_CI-FC6D26?logo=gitlab&logoColor=white)](https://gitlab.com)
+[![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)](https://docker.com/)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-2496ED?logo=kubernetes&logoColor=white)](https://kubernetes.io/)
 [![Wazuh](https://img.shields.io/badge/Wazuh-005B9A?logo=wazuh&logoColor=white)](https://wazuh.com)
 
@@ -68,7 +69,7 @@ Design and build a **production-grade-equivalent** DevSecOps pipeline that:
 ┌─────────────────────────────────────────────────────────┐
 │  WSL2 — Ubuntu 22.04 — Single control node              │
 │  Terraform · Ansible · kubectl                          │
-│  (replaces dedicated Management VM — saves 2 GB RAM)    │
+│                                                         │
 └────────────┬────────────┬────────────┬──────────────────┘
              │            │            │
    Host-Only 192.168.137.0/24 — isolated
