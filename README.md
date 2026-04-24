@@ -3,7 +3,7 @@
 > Master's Thesis · Central University of Tunis · Defense July 2026
 > Author: **Niane Mohamed** · [LinkedIn](https://linkedin.com/in/muhammed-niane) · muhammedniane@gmail.com
 
-End-to-end secure software delivery pipeline combining Infrastructure-as-Code, an 8-stage DevSecOps pipeline with a custom scoring-based Security Gate, Docker-based container orchestration, and centralized SIEM monitoring — all deployed on a resource-constrained 4-VM isolated lab.
+End-to-end secure software delivery pipeline combining Infrastructure-as-Code, a 7-stage DevSecOps pipeline with a custom scoring-based Security Gate, Docker-based container orchestration, and centralized SIEM monitoring — all deployed on a resource-constrained 4-VM isolated lab.
 
 [![Terraform](https://img.shields.io/badge/Terraform-623CE4?logo=terraform&logoColor=white)](https://terraform.io)
 [![Ansible](https://img.shields.io/badge/Ansible-EE0000?logo=ansible&logoColor=white)](https://ansible.com)
@@ -18,13 +18,14 @@ End-to-end secure software delivery pipeline combining Infrastructure-as-Code, a
 1. [Overview](#overview)
 2. [Architecture](#architecture)
 3. [Infrastructure as Code](#infrastructure-as-code)
-4. [8-Stage Security Pipeline](#8-stage-security-pipeline)
+4. [7-Stage Security Pipeline](#7-stage-security-pipeline)
 5. [Custom Security Gate](#custom-security-gate)
 6. [Docker Deployment](#docker-deployment)
 7. [Wazuh SIEM](#wazuh-siem)
-8. [Reproducibility](#reproducibility)
-9. [Results & Findings](#results--findings)
-10. [Skills Demonstrated](#skills-demonstrated)
+8. [End-to-End Flow](#end-to-end-flow)
+9. [Reproducibility](#reproducibility)
+10. [Results & Findings](#results--findings)
+11. [Skills Demonstrated](#skills-demonstrated)
 
 ---
 
@@ -60,25 +61,7 @@ Design and build a **production-grade-equivalent** DevSecOps pipeline that:
 
 ## Architecture
 
-![Architecture diagram](docs/flux_architecture_devsecops.svg)
-
-### Component Map
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  VM-Management — Ubuntu 22.04                           │
-│  Terraform · Ansible · Docker                           │
-└────────────┬────────────┬────────────┬──────────────────┘
-             │            │            │
-   Host-Only 192.168.137.0/24 — isolated
-             │            │            │
-       ┌─────▼─────┐┌─────▼─────┐┌─────▼─────┐
-       │  VM1      ││  VM2      ││  VM3      │
-       │  GitLab   ││  App      ││  Wazuh    │
-       │  .10      ││  .20      ││  .30      │
-       │  6 GB     ││  4 GB     ││  8 GB     │
-       └───────────┘└───────────┘└───────────┘
-```
+![Architecture Infrastructure — Vue d'ensemble](docs/architecture_infrastructure_vue_ensemble.svg)
 
 ### VMs Summary
 
@@ -145,27 +128,19 @@ ansible/
 
 ---
 
-## 8-Stage Security Pipeline
+## 7-Stage Security Pipeline
 
-Defined in `.gitlab-ci.yml` — runs on every push to `main` or `develop`.
-
-```
-┌──────────┐  ┌─────────┐  ┌───────────┐  ┌──────────┐  ┌───────┐  ┌──────────────┐  ┌──────┐  ┌────────┐
-│ GitLeaks │→ │ Semgrep │→ │ pip-audit │→ │ Docker   │→ │ Trivy │→ │ Security     │→ │ DAST │→ │ Deploy │
-│ secrets  │  │ SAST    │  │ CVE scan  │  │ Build    │  │ image │  │ Gate (score) │  │ ZAP  │  │        │
-└──────────┘  └─────────┘  └───────────┘  └──────────┘  └───────┘  └──────────────┘  └──────┘  └────────┘
-```
+![Pipeline DevSecOps — 7 stages](docs/pipeline_devsecops_detaillee.svg)
 
 | Stage | Tool | What it catches | Blocks on |
 |---|---|---|---|
 | 1 | GitLeaks | Hardcoded API keys, tokens, passwords in git history | Any finding |
-| 2 | Semgrep | SAST — OWASP Top 10, dangerous patterns, weak crypto | HIGH severity |
-| 3 | pip-audit | Known CVEs in Python dependencies | CRITICAL CVE |
-| 4 | Docker Build | Multi-stage build, non-root user, minimal base image | Build failure |
-| 5 | Trivy | Container image CVEs (OS + language layers) | HIGH/CRITICAL |
-| 6 | **Security Gate** | Aggregated score of all previous stages | **Score < 60/100** |
-| 7 | DAST | OWASP ZAP active scan against running container | DAST failure |
-| 8 | Deploy | `docker compose up` to VM2 app server | Deployment failure |
+| 2 | SAST — Semgrep + pip-audit | Insecure code patterns (OWASP Top 10) + known CVEs in dependencies | HIGH severity / CRITICAL CVE |
+| 3 | Docker Build | Multi-stage build, non-root user, minimal base image | Build failure |
+| 4 | Trivy | Container image CVEs (OS + language layers) | HIGH/CRITICAL |
+| 5 | **Security Gate** | Aggregated score of all previous stages | **Score < 60/100** |
+| 6 | DAST | OWASP ZAP active scan against running container | DAST failure |
+| 7 | Deploy | `docker compose up` to VM2 app server | Deployment failure |
 
 ### Artifacts Produced per Run
 
@@ -234,7 +209,7 @@ services:
 
 ### Zero-Downtime Deployment
 
-The pipeline performs a rolling replacement using Docker's `--no-deps --build` strategy, ensuring the previous container remains live until the new one passes its healthcheck.
+The pipeline performs a rolling replacement using Docker's `--no-deps` strategy, ensuring the previous container remains live until the new one passes its healthcheck.
 
 ```bash
 # deploy stage — .gitlab-ci.yml
@@ -248,6 +223,8 @@ deploy:
 ---
 
 ## Wazuh SIEM
+
+![Architecture SIEM Wazuh](docs/architecture_siem_wazuh.svg)
 
 ### Components
 
@@ -271,6 +248,12 @@ deploy:
 | Unusual Docker activity | T1609 | `docker exec` outside deployment windows |
 | Suspicious image pull | T1610 | Image pulled from unauthorized registry |
 | Container breakout attempt | T1611 | Syscall patterns matching known escapes |
+
+---
+
+## End-to-End Flow
+
+![Flux complet bout en bout](docs/flux_complet_bout_en_bout.svg)
 
 ---
 
@@ -319,13 +302,13 @@ cd terraform && terraform destroy
 
 - **100% pipeline event coverage** in SIEM (every stage produces audit events)
 - **~45 min** full lab provisioning from zero (Terraform + Ansible)
-- **< 3 min** pipeline execution on trivial code change (8 stages)
+- **< 5 min** pipeline execution on trivial code change (7 stages)
 - **0 s** downtime during deployment (validated across 50+ rolling replacements)
 
 ### Qualitative Lessons
 
-1. **Scoring gates > binary gates** for teams with mature security posture — they encourage improvement rather than suppression.
-2. **Docker is sufficient for single-service workloads** — all security contexts, healthchecks, and zero-downtime patterns achievable without Kubernetes overhead.
+1. **Scoring gates > binary gates** — they encourage improvement rather than suppression.
+2. **Docker is sufficient for single-service workloads** — all security contexts, healthchecks, and zero-downtime patterns are achievable without Kubernetes overhead.
 3. **Wazuh correlation rules require tuning** — out-of-the-box rulesets produced ~40% false positives. Custom rules tuned to the pipeline context brought this under 5%.
 4. **Secrets detection must run before anything else** — a secret that reaches any downstream tool (even a scanner's cache) is compromised.
 
@@ -334,6 +317,39 @@ cd terraform && terraform destroy
 - Single-host Docker — no native HA without Docker Swarm/Compose replicas
 - No production traffic load testing — lab only
 - MITRE rules tuned to Flask-app context — other frameworks would need adaptation
+
+---
+
+## Repository Structure
+
+```
+📦 devsecops-thesis/
+├── 📁 terraform/              # IaC — VM provisioning
+│   ├── main.tf
+│   ├── variables.tf
+│   └── outputs.tf
+├── 📁 ansible/                # Configuration management & hardening
+│   ├── inventory.yml
+│   ├── playbooks/
+│   └── roles/
+├── 📁 app/                    # Sample target application (Flask)
+│   ├── Dockerfile
+│   └── src/
+├── 📁 pipeline/
+│   └── .gitlab-ci.yml         # Main pipeline definition
+├── 📁 security-gate/          # Custom scoring engine
+│   └── gate.py
+├── 📁 wazuh/                  # SIEM configuration
+│   ├── rules/                 # Custom MITRE ATT&CK correlation rules
+│   └── dashboards/            # OpenSearch dashboard exports
+├── 📁 docs/                   # Architecture diagrams
+│   ├── architecture_infrastructure_vue_ensemble.svg
+│   ├── pipeline_devsecops_detaillee.svg
+│   ├── architecture_siem_wazuh.svg
+│   └── flux_complet_bout_en_bout.svg
+├── 📁 reports/                # Sample scan outputs (anonymised)
+└── README.md
+```
 
 ---
 
