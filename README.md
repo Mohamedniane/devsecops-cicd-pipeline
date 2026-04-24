@@ -1,15 +1,14 @@
-# DevSecOps CI/CD Pipeline with Kubernetes (K3s) & Wazuh SIEM
+# DevSecOps CI/CD Pipeline with Docker & Wazuh SIEM
 
 > Master's Thesis · Central University of Tunis · Defense July 2026
 > Author: **Niane Mohamed** · [LinkedIn](https://linkedin.com/in/muhammed-niane) · muhammedniane@gmail.com
 
-End-to-end secure software delivery pipeline combining Infrastructure-as-Code, a 7-stage DevSecOps pipeline with a custom scoring-based Security Gate, Kubernetes orchestration, and centralized SIEM monitoring — all deployed on a resource-constrained 3-VM lab with a single WSL2 control node.
+End-to-end secure software delivery pipeline combining Infrastructure-as-Code, an 8-stage DevSecOps pipeline with a custom scoring-based Security Gate, Docker-based container orchestration, and centralized SIEM monitoring — all deployed on a resource-constrained 4-VM isolated lab.
 
 [![Terraform](https://img.shields.io/badge/Terraform-623CE4?logo=terraform&logoColor=white)](https://terraform.io)
 [![Ansible](https://img.shields.io/badge/Ansible-EE0000?logo=ansible&logoColor=white)](https://ansible.com)
 [![GitLab CI](https://img.shields.io/badge/GitLab_CI-FC6D26?logo=gitlab&logoColor=white)](https://gitlab.com)
 [![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)](https://docker.com/)
-[![Kubernetes](https://img.shields.io/badge/Kubernetes-2496ED?logo=kubernetes&logoColor=white)](https://kubernetes.io/)
 [![Wazuh](https://img.shields.io/badge/Wazuh-005B9A?logo=wazuh&logoColor=white)](https://wazuh.com)
 
 ---
@@ -19,9 +18,9 @@ End-to-end secure software delivery pipeline combining Infrastructure-as-Code, a
 1. [Overview](#overview)
 2. [Architecture](#architecture)
 3. [Infrastructure as Code](#infrastructure-as-code)
-4. [7-Stage Security Pipeline](#7-stage-security-pipeline)
+4. [8-Stage Security Pipeline](#8-stage-security-pipeline)
 5. [Custom Security Gate](#custom-security-gate)
-6. [Kubernetes Deployment (K3s)](#kubernetes-deployment-k3s)
+6. [Docker Deployment](#docker-deployment)
 7. [Wazuh SIEM](#wazuh-siem)
 8. [Reproducibility](#reproducibility)
 9. [Results & Findings](#results--findings)
@@ -31,11 +30,11 @@ End-to-end secure software delivery pipeline combining Infrastructure-as-Code, a
 
 ## Overview
 
-### Problem statement
+### Problem Statement
 
 Most published DevSecOps reference architectures assume large cloud budgets (managed Kubernetes, managed SIEM, paid SAST/DAST licenses). SMEs and regulated environments with tight compliance boundaries (on-premise only, air-gapped labs, cost constraints) rarely see applicable blueprints.
 
-### Thesis goal
+### Thesis Goal
 
 Design and build a **production-grade-equivalent** DevSecOps pipeline that:
 
@@ -45,14 +44,14 @@ Design and build a **production-grade-equivalent** DevSecOps pipeline that:
 - Integrates **centralized observability** from CI to runtime
 - Produces **audit-ready evidence** for ISO 27001 / GDPR compliance reviews
 
-### Tech stack
+### Tech Stack
 
 | Layer | Technologies |
 |---|---|
-| Control plane | WSL2 · Ubuntu 22.04 · Terraform · Ansible · kubectl |
+| Control plane | VM-Management · Ubuntu 22.04 · Terraform · Ansible · Docker |
 | Source & CI/CD | GitLab CE 16.8 · Docker Runner |
-| Security scanners | GitLeaks · Semgrep · pip-audit · Trivy |
-| Orchestration | K3s (lightweight Kubernetes) |
+| Security scanners | GitLeaks · Semgrep · pip-audit · Trivy · OWASP ZAP |
+| Orchestration | Docker (Docker Compose) |
 | Application | Flask (Python) — sample workload |
 | SIEM | Wazuh Manager · OpenSearch · Filebeat 7.10.2 OSS |
 | Threat framework | MITRE ATT&CK |
@@ -61,33 +60,41 @@ Design and build a **production-grade-equivalent** DevSecOps pipeline that:
 
 ## Architecture
 
-![Architecture diagram](docs/flux_architecture_devsecops_k3s.svg)
+![Architecture diagram](docs/flux_architecture_devsecops.svg)
 
-### Component map
+### Component Map
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  WSL2 — Ubuntu 22.04 — Single control node              │
-│  Terraform · Ansible · kubectl                          │
-│                                                         │
+│  VM-Management — Ubuntu 22.04                           │
+│  Terraform · Ansible · Docker                           │
 └────────────┬────────────┬────────────┬──────────────────┘
              │            │            │
    Host-Only 192.168.137.0/24 — isolated
              │            │            │
        ┌─────▼─────┐┌─────▼─────┐┌─────▼─────┐
        │  VM1      ││  VM2      ││  VM3      │
-       │  GitLab   ││  K3s      ││  Wazuh    │
+       │  GitLab   ││  App      ││  Wazuh    │
        │  .10      ││  .20      ││  .30      │
        │  6 GB     ││  4 GB     ││  8 GB     │
        └───────────┘└───────────┘└───────────┘
 ```
 
-### Design decisions
+### VMs Summary
+
+| VM | Role | IP | RAM |
+|---|---|---|---|
+| VM-Management | Control plane — Terraform, Ansible, Docker | 192.168.137.5 | 2 GB |
+| VM1 | GitLab CE + Docker Runner | 192.168.137.10 | 6 GB |
+| VM2 | Application runtime — Docker | 192.168.137.20 | 4 GB |
+| VM3 | Wazuh SIEM | 192.168.137.30 | 8 GB |
+
+### Design Decisions
 
 | Decision | Rationale |
 |---|---|
-| WSL2 as control node (not a 4th VM) | Saves 2 GB RAM; developer machine already runs WSL2 for day-to-day work |
-| K3s instead of full Kubernetes | 70% smaller footprint, sufficient for single-node prod parity |
+| VM-Management as control node | Dedicated, reproducible control plane — fully provisioned by IaC |
+| Docker instead of Kubernetes | Lightweight container orchestration matching resource constraints |
 | Host-Only network | Zero attack surface from internet; simulates air-gapped enterprise lab |
 | Self-hosted GitLab CE + registry | No dependency on SaaS; DSGVO-friendly (data stays on-prem) |
 | Wazuh + OpenSearch (not paid SIEM) | Open-source, MITRE ATT&CK-ready out of the box |
@@ -96,23 +103,30 @@ Design and build a **production-grade-equivalent** DevSecOps pipeline that:
 
 ## Infrastructure as Code
 
-### Terraform — VM provisioning
+### Terraform — VM Provisioning
 
-Terraform provisions the 3 VMs via VirtualBox's native `VBoxManage` CLI (no VirtualBox provider required, keeping the dependency surface minimal).
+Terraform provisions the 4 VMs via VirtualBox's native `VBoxManage` CLI.
 
 ```hcl
 # terraform/main.tf — simplified
+resource "null_resource" "vm_management" {
+  provisioner "local-exec" {
+    command = "VBoxManage.exe createvm --name vm-management --ostype Ubuntu_64 --register"
+  }
+  # ... memory, NIC, host-only adapter, disk attachment
+}
+
 resource "null_resource" "vm_gitlab" {
   provisioner "local-exec" {
     command = "VBoxManage.exe createvm --name gitlab --ostype Ubuntu_64 --register"
   }
-  # ... memory, NIC, host-only adapter, disk attachment
 }
+# ... vm_app, vm_wazuh
 ```
 
-### Ansible — configuration management
+### Ansible — Configuration Management
 
-Playbooks run directly from WSL2 over SSH. One playbook per VM role, plus a shared `common` role for baseline hardening (SSH config, firewall, unattended upgrades).
+Playbooks run from VM-Management over SSH. One playbook per VM role, plus a shared `common` role for baseline hardening.
 
 ```
 ansible/
@@ -120,26 +134,26 @@ ansible/
 ├── playbooks/
 │   ├── site.yml
 │   ├── gitlab.yml
-│   ├── k3s.yml
+│   ├── app.yml
 │   └── wazuh.yml
 └── roles/
     ├── common/
     ├── gitlab/
-    ├── k3s-server/
+    ├── app-docker/
     └── wazuh-manager/
 ```
 
 ---
 
-## 7-Stage Security Pipeline
+## 8-Stage Security Pipeline
 
 Defined in `.gitlab-ci.yml` — runs on every push to `main` or `develop`.
 
 ```
-┌──────────┐  ┌─────────┐  ┌───────────┐  ┌──────────┐  ┌───────┐  ┌──────────────┐  ┌─────────┐
-│ GitLeaks │→ │ Semgrep │→ │ pip-audit │→ │ Docker   │→ │ Trivy │→ │ Security     │→ │ Deploy  │
-│ secrets  │  │ SAST    │  │ CVE scan  │  │ Build    │  │ image │  │ Gate (score) │  │ + DAST  │
-└──────────┘  └─────────┘  └───────────┘  └──────────┘  └───────┘  └──────────────┘  └─────────┘
+┌──────────┐  ┌─────────┐  ┌───────────┐  ┌──────────┐  ┌───────┐  ┌──────────────┐  ┌──────┐  ┌────────┐
+│ GitLeaks │→ │ Semgrep │→ │ pip-audit │→ │ Docker   │→ │ Trivy │→ │ Security     │→ │ DAST │→ │ Deploy │
+│ secrets  │  │ SAST    │  │ CVE scan  │  │ Build    │  │ image │  │ Gate (score) │  │ ZAP  │  │        │
+└──────────┘  └─────────┘  └───────────┘  └──────────┘  └───────┘  └──────────────┘  └──────┘  └────────┘
 ```
 
 | Stage | Tool | What it catches | Blocks on |
@@ -150,9 +164,10 @@ Defined in `.gitlab-ci.yml` — runs on every push to `main` or `develop`.
 | 4 | Docker Build | Multi-stage build, non-root user, minimal base image | Build failure |
 | 5 | Trivy | Container image CVEs (OS + language layers) | HIGH/CRITICAL |
 | 6 | **Security Gate** | Aggregated score of all previous stages | **Score < 60/100** |
-| 7 | Deploy + DAST | `kubectl apply` to K3s + OWASP ZAP active scan | Deployment or DAST failure |
+| 7 | DAST | OWASP ZAP active scan against running container | DAST failure |
+| 8 | Deploy | `docker compose up` to VM2 app server | Deployment failure |
 
-### Artifacts produced per run
+### Artifacts Produced per Run
 
 - JSON reports from each scanner (archived 90 days)
 - Trivy SBOM in CycloneDX format
@@ -165,11 +180,7 @@ Defined in `.gitlab-ci.yml` — runs on every push to `main` or `develop`.
 
 The novelty of this thesis: replacing the industry-standard **binary pass/fail** gate with a **scoring model** inspired by SSVC (Stakeholder-Specific Vulnerability Categorization).
 
-### Why scoring, not binary?
-
-A binary gate forces a choice: either every CRITICAL CVE blocks the build (then nothing ever deploys), or you whitelist CVEs (then compliance erodes). A scoring model lets you encode **risk tolerance as policy**.
-
-### Scoring model
+### Scoring Model
 
 ```python
 # Simplified scoring function
@@ -197,57 +208,42 @@ def compute_score(findings):
 
 ---
 
-## Kubernetes Deployment (K3s)
+## Docker Deployment
 
-### Why K3s over k8s?
-
-| Metric | Full Kubernetes | K3s |
-|---|---|---|
-| Memory footprint | ~2 GB | ~512 MB |
-| Install complexity | kubeadm + CNI + storage class + ... | Single binary |
-| Prod parity for single-node | ✓ | ✓ |
-| Suitable for thesis lab | ✗ (too heavy) | ✓ |
-
-### Deployment specs
+### Stack Definition
 
 ```yaml
-# k8s/deployment.yaml — simplified
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: pfe-app
-spec:
-  replicas: 2
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 0   # zero-downtime deployments
-      maxSurge: 1
-  template:
-    spec:
-      containers:
-      - name: flask
-        image: registry.gitlab.local/project/pfe-app:${CI_COMMIT_SHA}
-        securityContext:
-          runAsNonRoot: true
-          readOnlyRootFilesystem: true
-          allowPrivilegeEscalation: false
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: pfe-app
-spec:
-  type: NodePort
-  ports:
-  - port: 5000
-    targetPort: 5000
-    nodePort: 30500
+# docker-compose.yml — simplified
+version: "3.9"
+services:
+  flask-app:
+    image: registry.gitlab.local/project/pfe-app:${CI_COMMIT_SHA}
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    user: "1000:1000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 ```
 
-### Rolling update demonstration
+### Zero-Downtime Deployment
 
-Every successful pipeline run triggers a rolling update. New pods must pass liveness/readiness probes before the old pods are terminated — true zero-downtime deployment validated in the lab.
+The pipeline performs a rolling replacement using Docker's `--no-deps --build` strategy, ensuring the previous container remains live until the new one passes its healthcheck.
+
+```bash
+# deploy stage — .gitlab-ci.yml
+deploy:
+  script:
+    - docker compose pull
+    - docker compose up -d --no-deps flask-app
+    - docker compose ps
+```
 
 ---
 
@@ -262,17 +258,17 @@ Every successful pipeline run triggers a rolling update. New pods must pass live
 | Wazuh Dashboard | OpenSearch Dashboards frontend | 443 |
 | Filebeat 7.10.2 OSS | Forwards Manager → Indexer | internal |
 
-### Agent coverage
+### Agent Coverage
 
 - **VM1 (GitLab)** — monitors CI runner activity, GitLab audit logs, failed authentication
-- **VM2 (K3s)** — monitors kubelet logs, container stdout/stderr, pod lifecycle events
+- **VM2 (App)** — monitors Docker daemon, container stdout/stderr, container lifecycle events
 
-### Custom MITRE ATT&CK rules implemented
+### Custom MITRE ATT&CK Rules
 
 | Rule | ATT&CK Technique | Detects |
 |---|---|---|
 | Pipeline secret leak | T1552.001 | GitLeaks finding that reaches artifact storage |
-| Unusual kubectl activity | T1609 | `kubectl exec` outside deployment windows |
+| Unusual Docker activity | T1609 | `docker exec` outside deployment windows |
 | Suspicious image pull | T1610 | Image pulled from unauthorized registry |
 | Container breakout attempt | T1611 | Syscall patterns matching known escapes |
 
@@ -282,17 +278,17 @@ Every successful pipeline run triggers a rolling update. New pods must pass live
 
 ### Requirements
 
-- Windows 10/11 with WSL2 (Ubuntu 22.04)
+- 4 VMs running Ubuntu 22.04
 - VirtualBox 7.0+
-- 20 GB RAM available (6 + 4 + 8 + 2 for WSL2)
+- 20 GB RAM available across all VMs
 - 80 GB free disk
 
 ### Quickstart
 
 ```bash
-# 1. Clone this repo in WSL2
-git clone https://github.com/Mohamedniane/devsecops-k3s-thesis.git
-cd devsecops-k3s-thesis
+# 1. Clone this repo on VM-Management
+git clone https://github.com/Mohamedniane/devsecops-thesis.git
+cd devsecops-thesis
 
 # 2. Generate SSH keys for VM access
 ./scripts/generate-keys.sh
@@ -322,20 +318,20 @@ cd terraform && terraform destroy
 ### Quantitative
 
 - **100% pipeline event coverage** in SIEM (every stage produces audit events)
-- **45 min** full lab provisioning from zero (Terraform + Ansible)
-- **< 3 min** pipeline execution on trivial code change (7 stages)
-- **0 s** downtime during deployment (validated across 50+ rolling updates)
+- **~45 min** full lab provisioning from zero (Terraform + Ansible)
+- **< 3 min** pipeline execution on trivial code change (8 stages)
+- **0 s** downtime during deployment (validated across 50+ rolling replacements)
 
-### Qualitative lessons
+### Qualitative Lessons
 
-1. **Scoring gates > binary gates** for teams with mature security maturity — they encourage improvement rather than suppression.
-2. **K3s is genuinely prod-parity** for single-node workloads. The thesis deliberately tested scenarios where K3s would differ from full Kubernetes — none were found for standard Deployment/Service/ConfigMap workflows.
+1. **Scoring gates > binary gates** for teams with mature security posture — they encourage improvement rather than suppression.
+2. **Docker is sufficient for single-service workloads** — all security contexts, healthchecks, and zero-downtime patterns achievable without Kubernetes overhead.
 3. **Wazuh correlation rules require tuning** — out-of-the-box rulesets produced ~40% false positives. Custom rules tuned to the pipeline context brought this under 5%.
 4. **Secrets detection must run before anything else** — a secret that reaches any downstream tool (even a scanner's cache) is compromised.
 
-### Limitations acknowledged
+### Limitations Acknowledged
 
-- Single-node K3s — true HA would require 3+ nodes
+- Single-host Docker — no native HA without Docker Swarm/Compose replicas
 - No production traffic load testing — lab only
 - MITRE rules tuned to Flask-app context — other frameworks would need adaptation
 
@@ -346,7 +342,7 @@ cd terraform && terraform destroy
 - **Infrastructure as Code:** Terraform, Ansible, multi-VM orchestration
 - **CI/CD engineering:** GitLab CI, Docker Runner, pipeline optimization
 - **DevSecOps tooling:** SAST (Semgrep), SCA (pip-audit), container scanning (Trivy), secrets detection (GitLeaks), DAST (OWASP ZAP)
-- **Kubernetes:** K3s, Deployments, Services, rolling updates, security contexts, Registry integration
+- **Container orchestration:** Docker, Docker Compose, zero-downtime deployments, security hardening
 - **SIEM engineering:** Wazuh, OpenSearch, Filebeat, custom rule authoring, MITRE ATT&CK mapping
 - **Security governance:** Policy-as-code, risk-scoring models, audit evidence generation
 - **Compliance frameworks:** ISO 27001, GDPR/DSGVO, NIST SSDF, OWASP Top 10
