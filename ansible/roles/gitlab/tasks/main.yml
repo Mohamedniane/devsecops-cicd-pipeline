@@ -1,0 +1,28 @@
+---
+- name: Ajout dépôt GitLab CE
+  shell: |
+    curl -fsSL https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.deb.sh | bash
+  args:
+    creates: /etc/apt/sources.list.d/gitlab_gitlab-ce.list
+
+- name: Installation GitLab CE 16.8.1
+  apt:
+    name: "gitlab-ce=16.8.1-ce.0"
+    state: present
+    update_cache: yes
+  environment:
+    EXTERNAL_URL: "http://192.168.137.10"
+
+- name: Configuration gitlab.rb
+  template:
+    src: gitlab.rb.j2
+    dest: /etc/gitlab/gitlab.rb
+    mode: '0600'
+  notify: reconfigure gitlab
+
+- name: Attendre que GitLab soit prêt
+  wait_for:
+    port: 80
+    host: 192.168.137.10
+    delay: 30
+    timeout: 600

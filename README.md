@@ -26,7 +26,7 @@ An end-to-end DevSecOps platform built **only with open-source tools** on an **i
 7. [Attack Scenarios & Results](#attack-scenarios--results)
 8. [Lessons Learned](#lessons-learned)
 9. [Limitations & Roadmap](#limitations--roadmap)
-10. [Repository Status](#repository-status)
+10. [Repository Structure](#repository-structure)
 11. [Skills Demonstrated](#skills-demonstrated)
 
 ---
@@ -163,7 +163,7 @@ if score < THRESHOLD:
     print(">>> DEPLOYMENT BLOCKED <<<"); sys.exit(1)
 ```
 
-The job prints a per-source breakdown, so every decision is traceable and shows where remediation effort should go.
+The job prints a per-source breakdown, so every decision is traceable and shows where remediation effort should go. Source: [`app/security_gate.py`](app/security_gate.py).
 
 ---
 
@@ -188,7 +188,7 @@ The job prints a per-source breakdown, so every decision is traceable and shows 
 | 5760 | sshd: login attempt with non-existent user | 5 | T1110.001 |
 | 5763 | sshd: brute force (multiple) | 10 | T1110 |
 
-### Custom rules — network reconnaissance (`local_rules.xml`)
+### Custom rules — network reconnaissance ([`wazuh/local_rules.xml`](wazuh/local_rules.xml))
 
 ```xml
 <group name="local,nmap,recon,ufw,">
@@ -256,9 +256,24 @@ Documented honestly in the thesis:
 
 ---
 
-## Repository Status
+## Repository Structure
 
-This repository currently contains the architecture documentation and diagrams (`docs/`). Infrastructure code (Terraform, Ansible), the pipeline definition, the Security Gate and the Wazuh rules are being published progressively, after review for sensitive data.
+```
+.
+├── app/                     # The GitLab project: sample Flask app + 7-stage pipeline
+│   ├── .gitlab-ci.yml       # Pipeline definition
+│   ├── security_gate.py     # Security Gate scoring engine
+│   ├── Dockerfile
+│   └── src/                 # app.py, requirements.txt
+├── terraform/               # VM provisioning (VirtualBox module + inventory template)
+├── ansible/                 # Configuration management: site.yml + 6 roles
+├── wazuh/
+│   └── local_rules.xml      # Custom detection rules 100000 / 100001
+└── docs/                    # Architecture diagrams
+```
+
+> The code targets the isolated lab described above (fixed IPs, VirtualBox driven from WSL2 on Windows). Copy `terraform/terraform.tfvars.example` to `terraform/terraform.tfvars` and adapt the paths before use.
+> The attack-scenario branches are **not** published: they contain intentionally vulnerable code and demo credentials.
 
 ---
 

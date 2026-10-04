@@ -1,0 +1,43 @@
+---
+- name: Supprimer les anciennes versions Docker
+  apt:
+    name:
+      - docker
+      - docker-engine
+      - docker.io
+      - containerd
+      - runc
+    state: absent
+
+- name: Clé GPG Docker
+  shell: |
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
+    gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+  args:
+    creates: /usr/share/keyrings/docker-archive-keyring.gpg
+
+- name: Dépôt Docker
+  apt_repository:
+    repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu jammy stable"
+    state: present
+
+- name: Installation Docker
+  apt:
+    name:
+      - docker-ce=5:24.0.5-1~ubuntu.22.04~jammy
+      - docker-ce-cli=5:24.0.5-1~ubuntu.22.04~jammy
+      - containerd.io
+    state: present
+    update_cache: yes
+
+- name: Démarrage Docker
+  systemd:
+    name: docker
+    state: started
+    enabled: yes
+
+- name: Ajouter l'utilisateur au groupe docker
+  user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: yes

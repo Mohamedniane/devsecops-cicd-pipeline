@@ -1,0 +1,6 @@
+---
+- name: Installation Wazuh VM3
+  hosts: wazuh
+  become: yes
+  roles:
+    - wazuh_server

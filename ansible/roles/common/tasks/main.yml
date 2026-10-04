@@ -1,0 +1,44 @@
+---
+- name: Mise à jour du cache apt
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Installation des paquets essentiels
+  apt:
+    name:
+      - curl
+      - wget
+      - git
+      - apt-transport-https
+      - ca-certificates
+      - gnupg
+      - python3-pip
+      - ufw
+      - net-tools
+      - htop
+    state: present
+
+- name: Configuration du hostname
+  hostname:
+    name: "{{ inventory_hostname }}"
+
+- name: Désactiver le swap (requis pour Wazuh/Elasticsearch)
+  shell: |
+    swapoff -a
+    sed -i '/swap/d' /etc/fstab
+  when: inventory_hostname in groups['wazuh']
+
+- name: vm.max_map_count pour Elasticsearch
+  sysctl:
+    name: vm.max_map_count
+    value: '262144'
+    state: present
+    reload: yes
+  when: inventory_hostname in groups['wazuh']
+
+- name: Créer le dossier de logs Ansible
+  file:
+    path: /var/log/ansible
+    state: directory
+    mode: '0755'

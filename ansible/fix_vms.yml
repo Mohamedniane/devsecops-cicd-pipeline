@@ -1,0 +1,20 @@
+---
+- name: Fix VM2 Docker
+  hosts: application
+  become: yes
+  roles:
+    - docker
+
+- name: Fix VM3 Wazuh services
+  hosts: wazuh
+  become: yes
+  tasks:
+    - name: Démarrage services Wazuh
+      systemd:
+        name: "{{ item }}"
+        state: started
+        enabled: yes
+      loop:
+        - wazuh-indexer
+        - wazuh-manager
+        - wazuh-dashboard

@@ -1,0 +1,9 @@
+external_url 'http://192.168.137.10'
+nginx['redirect_http_to_https'] = false
+puma['worker_processes'] = 2
+sidekiq['concurrency'] = 5
+postgresql['shared_buffers'] = "256MB"
+prometheus_monitoring['enable'] = false
+grafana['enable'] = false
+gitlab_rails['registry_enabled'] = true
+registry_external_url 'http://192.168.137.10:5050'

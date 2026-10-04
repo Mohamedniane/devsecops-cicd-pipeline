@@ -1,0 +1,37 @@
+---
+- name: Configuration commune (VM1, VM2, VM3)
+  hosts: internal
+  become: yes
+  roles:
+    - common
+
+- name: VM1 — Docker
+  hosts: gitlab
+  become: yes
+  roles:
+    - docker
+
+- name: VM1 — GitLab CE + Runner
+  hosts: gitlab
+  become: yes
+  roles:
+    - gitlab
+    - gitlab_runner
+
+- name: VM2 — Docker
+  hosts: application
+  become: yes
+  roles:
+    - docker
+
+- name: VM3 — Wazuh SIEM
+  hosts: wazuh
+  become: yes
+  roles:
+    - wazuh_server
+
+- name: Agents Wazuh sur VM1 et VM2
+  hosts: gitlab,application
+  become: yes
+  roles:
+    - wazuh_agent

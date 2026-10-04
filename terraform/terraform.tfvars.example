@@ -1,0 +1,9 @@
+# Copy to terraform.tfvars and adapt to your machine (terraform.tfvars is git-ignored)
+iso_path          = "/path/to/ubuntu-22.04.3-live-server-amd64.iso"
+host_only_adapter = "VirtualBox Host-Only Ethernet Adapter"
+vboxmanage_path   = "/mnt/c/PROGRA~1/Oracle/VirtualBox/VBoxManage.exe"
+
+vm_basefolder_management = "D:\\VMs\\VM_management"
+vm_basefolder_gitlab     = "D:\\VMs\\VM_gitlab"
+vm_basefolder_app        = "D:\\VMs\\VM_app"
+vm_basefolder_wazuh      = "D:\\VMs\\VM_wazuh"

@@ -1,0 +1,6 @@
+---
+- name: Installation agents Wazuh
+  hosts: gitlab,application
+  become: yes
+  roles:
+    - wazuh_agent

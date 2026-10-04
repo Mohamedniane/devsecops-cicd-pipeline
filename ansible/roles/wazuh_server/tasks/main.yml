@@ -1,0 +1,34 @@
+---
+- name: Clé GPG Wazuh
+  shell: |
+    curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH | \
+    gpg --no-default-keyring \
+        --keyring gnupg-ring:/usr/share/keyrings/wazuh.gpg \
+        --import
+    chmod 644 /usr/share/keyrings/wazuh.gpg
+  args:
+    creates: /usr/share/keyrings/wazuh.gpg
+
+- name: Dépôt Wazuh 4.7
+  apt_repository:
+    repo: "deb [signed-by=/usr/share/keyrings/wazuh.gpg] https://packages.wazuh.com/4.x/apt/ stable main"
+    state: present
+
+- name: Installation Wazuh
+  apt:
+    name:
+      - wazuh-manager=4.7.0-1
+      - wazuh-indexer=4.7.0-1
+      - wazuh-dashboard=4.7.0-1
+    state: present
+    update_cache: yes
+
+- name: Démarrage services Wazuh
+  systemd:
+    name: "{{ item }}"
+    state: started
+    enabled: yes
+  loop:
+    - wazuh-indexer
+    - wazuh-manager
+    - wazuh-dashboard

@@ -1,0 +1,24 @@
+---
+- name: Ajout dépôt GitLab Runner
+  shell: |
+    curl -fsSL https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.deb.sh | bash
+  args:
+    creates: /etc/apt/sources.list.d/runner_gitlab-runner.list
+
+- name: Installation GitLab Runner
+  apt:
+    name: "gitlab-runner=16.8.0-1"
+    state: present
+    update_cache: yes
+
+- name: Ajouter gitlab-runner au groupe docker
+  user:
+    name: gitlab-runner
+    groups: docker
+    append: yes
+
+- name: Démarrage GitLab Runner
+  systemd:
+    name: gitlab-runner
+    state: started
+    enabled: yes
